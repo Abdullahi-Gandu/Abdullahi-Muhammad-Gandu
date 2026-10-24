@@ -1,0 +1,6 @@
+{
+  "name": "GridPulse EMS - Power House Dispatch Operator",
+  "description": "Real-time power house and electrical grid dispatch dashboard with automated critical push notifications, equipment telemetry, single line diagram, and outage management for mobile and desktop.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

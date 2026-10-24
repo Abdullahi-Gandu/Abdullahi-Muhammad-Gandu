@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d"/>
+      <stop offset="100%" stop-color="#050811"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+    <linearGradient id="ringGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.2"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#1e293b" stroke-width="6"/>
+
+  <!-- Substation Grid Lines -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#1e293b" stroke-width="3" stroke-dasharray="8 6"/>
+  <circle cx="256" cy="256" r="130" fill="none" stroke="url(#ringGlow)" stroke-width="4"/>
+  <circle cx="256" cy="256" r="60" fill="#0f172a" stroke="#0ea5e9" stroke-width="3"/>
+
+  <!-- Grid Crosshairs -->
+  <line x1="256" y1="56" x2="256" y2="456" stroke="#1e293b" stroke-width="2"/>
+  <line x1="56" y1="256" x2="456" y2="256" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- Power Wave Telemetry -->
+  <path d="M 100 256 Q 140 180, 180 256 T 256 256 T 332 256 T 412 256" fill="none" stroke="#0284c7" stroke-width="4" stroke-opacity="0.4"/>
+
+  <!-- Central High-Voltage Bolt -->
+  <path d="M280 110 L195 270 L260 270 L232 402 L320 238 L255 238 Z" fill="url(#bolt)" filter="url(#glow)"/>
+
+  <!-- Status nodes -->
+  <circle cx="256" cy="76" r="10" fill="#10b981"/>
+  <circle cx="436" cy="256" r="10" fill="#0ea5e9"/>
+  <circle cx="256" cy="436" r="10" fill="#f59e0b"/>
+  <circle cx="76" cy="256" r="10" fill="#10b981"/>
+</svg>
