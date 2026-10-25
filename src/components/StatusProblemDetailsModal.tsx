@@ -15,6 +15,7 @@ import {
   Phone,
   Power,
   Hospital,
+  Edit2,
 } from 'lucide-react';
 import { useDispatch } from '../context/DispatchContext';
 import { smsDispatcher } from '../utils/smsNotifier';
@@ -39,6 +40,8 @@ export const StatusProblemDetailsModal: React.FC<StatusProblemDetailsModalProps>
     toggleFeederBreaker,
     acknowledgeAllAlerts,
     activeOperator,
+    smsRecipient,
+    openSmsModal,
   } = useDispatch();
 
   if (!isOpen) return null;
@@ -154,8 +157,19 @@ export const StatusProblemDetailsModal: React.FC<StatusProblemDetailsModalProps>
           <div className="flex items-center gap-2 text-[11px]">
             <span className="text-slate-400">SMS GATEWAY:</span>
             <span className="text-sky-400 font-bold flex items-center gap-1">
-              <Phone className="w-3 h-3 text-sky-400" /> +2348067254663
+              <Phone className="w-3 h-3 text-sky-400" /> {smsRecipient}
             </span>
+            <button
+              onClick={() => {
+                onClose();
+                openSmsModal();
+              }}
+              className="px-2 py-0.5 rounded bg-sky-950 hover:bg-sky-900 border border-sky-700 text-sky-300 text-[10px] flex items-center gap-1 font-semibold transition"
+              title="Click to edit SMS recipient number"
+            >
+              <Edit2 className="w-2.5 h-2.5" />
+              <span>Edit</span>
+            </button>
           </div>
         </div>
 

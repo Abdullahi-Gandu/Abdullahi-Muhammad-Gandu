@@ -9,10 +9,15 @@ import { SingleLineDiagram } from './components/SingleLineDiagram';
 import { FeedersOutagePanel } from './components/FeedersOutagePanel';
 import { SubstationTransformersPanel } from './components/SubstationTransformersPanel';
 import { ElectricalLogsheetPanel } from './components/ElectricalLogsheetPanel';
+import { OperatorRosterPanel } from './components/OperatorRosterPanel';
+import { IndependentOperatorReport } from './components/IndependentOperatorReport';
 import { AlertsAndOutageLog } from './components/AlertsAndOutageLog';
 import { DispatchLogbook } from './components/DispatchLogbook';
 import { SimulationControlsModal } from './components/SimulationControlsModal';
 import { StatusProblemDetailsModal } from './components/StatusProblemDetailsModal';
+import { OperatorModal } from './components/OperatorModal';
+import { OperatorLoginModal } from './components/OperatorLoginModal';
+import { EditSmsModal } from './components/EditSmsModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   Activity,
@@ -22,12 +27,36 @@ import {
   BookOpen,
   ClipboardList,
   Sliders,
+  UserCheck,
+  FileText,
 } from 'lucide-react';
 
-type TabView = 'OVERVIEW' | 'SLD' | 'FEEDERS' | 'TRANSFORMERS' | 'LOGSHEET' | 'ALERTS' | 'LOGS';
+type TabView =
+  | 'OVERVIEW'
+  | 'SLD'
+  | 'FEEDERS'
+  | 'TRANSFORMERS'
+  | 'LOGSHEET'
+  | 'OPERATORS'
+  | 'REPORTS'
+  | 'ALERTS'
+  | 'LOGS';
 
 function FutureXConsole() {
-  const { metrics, alerts, activeOperator, isStatusModalOpen, closeStatusModal } = useDispatch();
+  const {
+    metrics,
+    alerts,
+    activeOperator,
+    isStatusModalOpen,
+    closeStatusModal,
+    isSmsModalOpen,
+    closeSmsModal,
+    isOperatorModalOpen,
+    closeOperatorModal,
+    isLoginModalOpen,
+    closeLoginModal,
+  } = useDispatch();
+
   const [activeTab, setActiveTab] = useState<TabView>('OVERVIEW');
   const [isSimulationOpen, setIsSimulationOpen] = useState(false);
 
@@ -93,7 +122,7 @@ function FutureXConsole() {
               }`}
             >
               <Sliders className="w-3.5 h-3.5 text-amber-500" />
-              <span>TRANSFORMERS (132/33 & 33/11)</span>
+              <span>TRANSFORMERS</span>
             </button>
 
             <button
@@ -106,6 +135,31 @@ function FutureXConsole() {
             >
               <ClipboardList className="w-3.5 h-3.5 text-emerald-400" />
               <span>OPERATOR LOGSHEET</span>
+            </button>
+
+            {/* Dedicated place for Operators: Name assignment & changes */}
+            <button
+              onClick={() => setActiveTab('OPERATORS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'OPERATORS'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-sky-400" />
+              <span>OPERATORS & ASSIGNMENT</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('REPORTS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'REPORTS'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>INDEPENDENT REPORT</span>
             </button>
 
             <button
@@ -158,6 +212,8 @@ function FutureXConsole() {
             <FeedersOutagePanel />
             <SubstationTransformersPanel />
             <ElectricalLogsheetPanel />
+            <OperatorRosterPanel />
+            <IndependentOperatorReport />
             <AlertsAndOutageLog />
           </div>
         )}
@@ -184,6 +240,18 @@ function FutureXConsole() {
         {activeTab === 'LOGSHEET' && (
           <div className="space-y-4">
             <ElectricalLogsheetPanel />
+          </div>
+        )}
+
+        {activeTab === 'OPERATORS' && (
+          <div className="space-y-4">
+            <OperatorRosterPanel />
+          </div>
+        )}
+
+        {activeTab === 'REPORTS' && (
+          <div className="space-y-4">
+            <IndependentOperatorReport />
           </div>
         )}
 
@@ -236,23 +304,33 @@ function FutureXConsole() {
         </button>
 
         <button
-          onClick={() => setActiveTab('TRANSFORMERS')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded text-[10px] ${
-            activeTab === 'TRANSFORMERS' ? 'text-sky-400 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <Sliders className="w-4 h-4 mb-0.5" />
-          <span>TXs</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('LOGSHEET')}
           className={`flex flex-col items-center py-1 px-1.5 rounded text-[10px] ${
             activeTab === 'LOGSHEET' ? 'text-sky-400 font-bold' : 'text-slate-400'
           }`}
         >
           <ClipboardList className="w-4 h-4 mb-0.5" />
-          <span>Logsheet</span>
+          <span>Logs</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('OPERATORS')}
+          className={`flex flex-col items-center py-1 px-1.5 rounded text-[10px] ${
+            activeTab === 'OPERATORS' ? 'text-sky-400 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <UserCheck className="w-4 h-4 mb-0.5" />
+          <span>Operators</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('REPORTS')}
+          className={`flex flex-col items-center py-1 px-1.5 rounded text-[10px] ${
+            activeTab === 'REPORTS' ? 'text-sky-400 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <FileText className="w-4 h-4 mb-0.5" />
+          <span>Report</span>
         </button>
 
         <button
@@ -269,16 +347,6 @@ function FutureXConsole() {
             </span>
           )}
         </button>
-
-        <button
-          onClick={() => setActiveTab('LOGS')}
-          className={`flex flex-col items-center py-1 px-1.5 rounded text-[10px] ${
-            activeTab === 'LOGS' ? 'text-sky-400 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 mb-0.5" />
-          <span>Logs</span>
-        </button>
       </nav>
 
       {/* Simulation Controls Modal */}
@@ -291,6 +359,24 @@ function FutureXConsole() {
       <StatusProblemDetailsModal
         isOpen={isStatusModalOpen}
         onClose={closeStatusModal}
+      />
+
+      {/* Operator Assignment & Profile Modal */}
+      <OperatorModal
+        isOpen={isOperatorModalOpen}
+        onClose={closeOperatorModal}
+      />
+
+      {/* Operator SCADA Login & Authentication Modal */}
+      <OperatorLoginModal
+        isOpen={isLoginModalOpen}
+        onClose={closeLoginModal}
+      />
+
+      {/* Edit SMS Text Alert Recipient Modal */}
+      <EditSmsModal
+        isOpen={isSmsModalOpen}
+        onClose={closeSmsModal}
       />
 
       {/* Offline Status Toast */}

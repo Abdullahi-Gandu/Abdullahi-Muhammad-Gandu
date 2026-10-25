@@ -10,10 +10,14 @@ import {
   User,
   Users,
   Phone,
+  Edit2,
+  Lock,
+  Unlock,
+  LogOut,
+  KeyRound,
 } from 'lucide-react';
 import { useDispatch } from '../context/DispatchContext';
 import { PWAInstallButton } from './PWAInstallButton';
-import { OperatorModal } from './OperatorModal';
 
 interface DispatchHeaderProps {
   onOpenSimulation: () => void;
@@ -33,11 +37,18 @@ export const DispatchHeader: React.FC<DispatchHeaderProps> = ({
     acknowledgeAllAlerts,
     activeOperator,
     openStatusModal,
+    smsRecipient,
+    openSmsModal,
+    openOperatorModal,
+    isLoggedIn,
+    openLoginModal,
+    lockConsole,
+    logoutOperator,
+    currentSession,
   } = useDispatch();
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentUtc, setCurrentUtc] = useState<string>('');
-  const [isOperatorModalOpen, setIsOperatorModalOpen] = useState(false);
 
   useEffect(() => {
     const updateClocks = () => {
@@ -104,30 +115,81 @@ export const DispatchHeader: React.FC<DispatchHeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: Operator Profile Pill (Click to Switch or Add User) */}
-        <div
-          onClick={() => setIsOperatorModalOpen(true)}
-          className="cursor-pointer bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-sky-600 rounded-lg px-3 py-1.5 shadow-sm transition flex items-center gap-2.5"
-          title="Click to switch duty operator or register a new operator profile"
-        >
+        {/* Center: Operator Profile & Unique Login / Console Lock Controller */}
+        <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 rounded-lg p-1 shadow-sm">
+          {/* Operator Identity Pill */}
           <div
-            className={`w-7 h-7 rounded-full ${
-              activeOperator.avatarColor || 'bg-sky-600'
-            } flex items-center justify-center text-white font-bold text-xs uppercase shadow`}
+            onClick={openLoginModal}
+            className={`cursor-pointer rounded-md px-2.5 py-1 transition flex items-center gap-2 group ${
+              isLoggedIn
+                ? 'hover:bg-slate-800'
+                : 'bg-amber-950/80 border border-amber-600 text-amber-200 animate-pulse'
+            }`}
+            title={isLoggedIn ? "Authenticated Operator — Click to Switch Duty Operator / Login" : "Console Locked — Click to Login with Operator PIN"}
           >
-            {activeOperator.name.slice(0, 2)}
+            <div
+              className={`w-6 h-6 rounded-full ${
+                activeOperator.avatarColor || 'bg-sky-600'
+              } flex items-center justify-center text-white font-bold text-[10px] uppercase shadow-xs shrink-0`}
+            >
+              {activeOperator.name.slice(0, 2)}
+            </div>
+            <div>
+              <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-100">
+                <span className="group-hover:text-sky-300 transition">{activeOperator.name}</span>
+                <span className="text-[8px] px-1 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800 font-semibold uppercase">
+                  {activeOperator.id}
+                </span>
+                {!isLoggedIn && (
+                  <span className="text-[8px] px-1 py-0.2 rounded bg-amber-600 text-slate-950 font-black uppercase">
+                    LOCKED
+                  </span>
+                )}
+              </div>
+              <div className="text-[9px] font-mono text-slate-400 flex items-center gap-1">
+                <span>{activeOperator.role}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-amber-400 flex items-center gap-0.5">
+                  <KeyRound className="w-2.5 h-2.5" />
+                  {isLoggedIn ? 'PIN Active' : 'Login'}
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-100">
-              <span>{activeOperator.name}</span>
-              <span className="text-[9px] px-1 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800 font-semibold uppercase">
-                {activeOperator.id}
-              </span>
-            </div>
-            <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
-              <span>{activeOperator.role}</span>
-              <span className="text-sky-400 underline decoration-dotted ml-1">Switch</span>
-            </div>
+
+          <div className="h-6 w-[1px] bg-slate-800" />
+
+          {/* Quick Lock / Switch Buttons */}
+          <div className="flex items-center gap-1 pr-1">
+            {isLoggedIn ? (
+              <>
+                <button
+                  onClick={lockConsole}
+                  className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition text-[10px] flex items-center gap-1 font-mono cursor-pointer"
+                  title="Lock Console (Requires PIN to switch breakers)"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline text-[9px] uppercase font-bold">Lock</span>
+                </button>
+                <button
+                  onClick={openLoginModal}
+                  className="px-2 py-1 rounded bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 transition text-[9px] font-bold uppercase flex items-center gap-1 cursor-pointer"
+                  title="Switch Operator Login with PIN"
+                >
+                  <User className="w-2.5 h-2.5" />
+                  <span>Switch</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={openLoginModal}
+                className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 transition text-[10px] font-bold uppercase flex items-center gap-1 shadow-sm cursor-pointer"
+                title="Authorize with PIN to Unlock SCADA"
+              >
+                <Unlock className="w-3 h-3" />
+                <span>Unlock Terminal</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -184,17 +246,21 @@ export const DispatchHeader: React.FC<DispatchHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: SMS target, Audio siren, Push Alert Diagnostic, Simulation Drills, PWA Install */}
+        {/* Right: SMS target (Editable button), Audio siren, Push Alert Diagnostic, Simulation Drills, PWA Install */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* SMS Status to +2348067254663 */}
+          {/* Editable SMS Recipient Button */}
           <button
-            onClick={openStatusModal}
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-900 border border-slate-800 hover:border-sky-600 text-slate-300 hover:text-white text-xs font-mono transition"
-            title="Automated SMS Text Alerts routed to +2348067254663 (Click for problems & SMS outbox)"
+            onClick={openSmsModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-900 border border-sky-800/80 hover:border-sky-500 text-slate-200 hover:text-white text-xs font-mono transition shadow-xs group"
+            title="Click to edit destination phone number for SMS alerts"
           >
-            <Phone className="w-3.5 h-3.5 text-sky-400" />
-            <span className="text-[10px] text-slate-400">SMS:</span>
-            <span className="text-[11px] font-bold text-sky-400">+2348067254663</span>
+            <Phone className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] text-slate-400 hidden xs:inline">SMS:</span>
+            <span className="text-[11px] font-bold text-sky-300">{smsRecipient}</span>
+            <span className="hidden sm:inline-flex items-center gap-0.5 px-1 py-0.2 rounded bg-sky-950 text-sky-400 border border-sky-800 text-[9px] font-bold uppercase ml-0.5 group-hover:bg-sky-900">
+              <Edit2 className="w-2.5 h-2.5" />
+              <span>Edit</span>
+            </span>
           </button>
 
           {/* Audio siren toggle */}
@@ -254,12 +320,6 @@ export const DispatchHeader: React.FC<DispatchHeaderProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Operator Modal for Profile Switch / Registration */}
-      <OperatorModal
-        isOpen={isOperatorModalOpen}
-        onClose={() => setIsOperatorModalOpen(false)}
-      />
     </header>
   );
 };

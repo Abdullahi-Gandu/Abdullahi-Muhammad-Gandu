@@ -9,7 +9,39 @@ export interface OperatorProfile {
   shift: 'Morning Shift (06:00 - 14:00)' | 'Afternoon Shift (14:00 - 22:00)' | 'Night Shift (22:00 - 06:00)';
   phone?: string;
   avatarColor: string;
+  pin: string; // Confidential login PIN / passcode (e.g. '1234')
+  badgeNumber?: string;
+  lastLogin?: string;
 }
+
+export interface OperatorSession {
+  sessionId: string;
+  operatorId: string;
+  operatorName: string;
+  role: string;
+  shift: string;
+  loginTime: string;
+  loginDate: string;
+  logoutTime?: string;
+  isActive: boolean;
+}
+
+export interface OperatorShiftHandoverReport {
+  operatorId: string;
+  operatorName: string;
+  shift: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  totalLogsRecorded: number;
+  totalBreakerOperations: number;
+  totalAlarmsAcknowledged: number;
+  totalOutagesManaged: number;
+  avgSystemFrequencyHz: number;
+  peakLoadMW: number;
+  handoverRemarks: string;
+}
+
 
 export interface FeederLine {
   id: string;

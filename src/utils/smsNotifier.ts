@@ -20,6 +20,10 @@ class SMSDispatchManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      const savedPhone = localStorage.getItem('futurex_sms_recipient');
+      if (savedPhone) {
+        this.primaryRecipient = savedPhone;
+      }
       const saved = localStorage.getItem('futurex_sms_logs');
       if (saved) {
         try {
@@ -32,6 +36,14 @@ class SMSDispatchManager {
   }
 
   public getRecipient(): string {
+    return this.primaryRecipient;
+  }
+
+  public setRecipient(phone: string): string {
+    this.primaryRecipient = phone.trim() || PRIMARY_DISPATCH_PHONE;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('futurex_sms_recipient', this.primaryRecipient);
+    }
     return this.primaryRecipient;
   }
 

@@ -8,6 +8,7 @@ import {
   GridStatus,
   BreakerState,
   OperatorProfile,
+  OperatorSession,
   ElectricalHourlyLog,
 } from '../types/dispatch';
 import { dispatchAudio } from '../utils/audioAlert';
@@ -28,14 +29,40 @@ interface DispatchContextType {
   soundMuted: boolean;
   notificationPermission: NotificationPermission;
 
+  smsRecipient: string;
+  updateSmsRecipient: (phone: string) => void;
+  isSmsModalOpen: boolean;
+  openSmsModal: () => void;
+  closeSmsModal: () => void;
+
+  isOperatorModalOpen: boolean;
+  openOperatorModal: () => void;
+  closeOperatorModal: () => void;
+
   isStatusModalOpen: boolean;
   openStatusModal: () => void;
   closeStatusModal: () => void;
   sendSMSAlert: (title: string, body: string) => Promise<void>;
 
+  // Operator Auth & Unique Login
+  isLoggedIn: boolean;
+  currentSession: OperatorSession | null;
+  isLoginModalOpen: boolean;
+  openLoginModal: () => void;
+  closeLoginModal: () => void;
+  loginOperator: (id: string, pin: string) => { success: boolean; error?: string };
+  logoutOperator: () => void;
+  lockConsole: () => void;
+  unlockConsole: (pin: string) => { success: boolean; error?: string };
+  updateOperatorPin: (id: string, oldPin: string, newPin: string) => { success: boolean; error?: string };
+
   // Actions
   setActiveOperatorById: (id: string) => void;
+  updateActiveOperator: (updated: Partial<OperatorProfile>) => void;
+  updateOperator: (id: string, updated: Partial<OperatorProfile>) => void;
+  deleteOperator: (id: string) => void;
   addOperator: (operator: OperatorProfile) => void;
+  updateFeeder: (id: string, updated: Partial<FeederLine>) => void;
   toggleFeederBreaker: (feederId: string) => void;
   adjustTransformerTap: (txId: string, delta: number) => void;
   toggleCoolingFans: (txId: string) => void;
@@ -69,6 +96,9 @@ const DEFAULT_OPERATORS: OperatorProfile[] = [
     shift: 'Morning Shift (06:00 - 14:00)',
     phone: '+234 803 123 4567',
     avatarColor: 'bg-sky-600',
+    pin: '1234',
+    badgeNumber: 'TCN-FX-7041',
+    lastLogin: 'Today, 06:00 WAT',
   },
   {
     id: 'FX-OP-02',
@@ -77,6 +107,9 @@ const DEFAULT_OPERATORS: OperatorProfile[] = [
     shift: 'Afternoon Shift (14:00 - 22:00)',
     phone: '+234 802 987 6543',
     avatarColor: 'bg-emerald-600',
+    pin: '2345',
+    badgeNumber: 'TCN-FX-7082',
+    lastLogin: 'Yesterday, 14:00 WAT',
   },
   {
     id: 'FX-OP-03',
@@ -85,6 +118,9 @@ const DEFAULT_OPERATORS: OperatorProfile[] = [
     shift: 'Morning Shift (06:00 - 14:00)',
     phone: '+234 805 555 1212',
     avatarColor: 'bg-amber-600',
+    pin: '3456',
+    badgeNumber: 'TCN-FX-7103',
+    lastLogin: 'Yesterday, 06:00 WAT',
   },
   {
     id: 'FX-OP-04',
@@ -93,6 +129,9 @@ const DEFAULT_OPERATORS: OperatorProfile[] = [
     shift: 'Night Shift (22:00 - 06:00)',
     phone: '+234 806 777 8899',
     avatarColor: 'bg-purple-600',
+    pin: '4567',
+    badgeNumber: 'TCN-FX-7158',
+    lastLogin: '2 days ago, 22:00 WAT',
   },
 ];
 
@@ -344,12 +383,59 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Operators
   const [operators, setOperators] = useState<OperatorProfile[]>(() => {
     const saved = localStorage.getItem('futurex_operators');
-    return saved ? JSON.parse(saved) : DEFAULT_OPERATORS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((op: Partial<OperatorProfile>, idx: number) => ({
+            ...DEFAULT_OPERATORS[idx % DEFAULT_OPERATORS.length],
+            ...op,
+            pin: op.pin || DEFAULT_OPERATORS[idx % DEFAULT_OPERATORS.length]?.pin || '1234',
+            badgeNumber: op.badgeNumber || DEFAULT_OPERATORS[idx % DEFAULT_OPERATORS.length]?.badgeNumber || `TCN-FX-${7040 + idx * 30}`,
+            lastLogin: op.lastLogin || 'Today, 06:00 WAT',
+          }));
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return DEFAULT_OPERATORS;
   });
 
   const [activeOperator, setActiveOperator] = useState<OperatorProfile>(() => {
     return operators[0] || DEFAULT_OPERATORS[0];
   });
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    const saved = localStorage.getItem('futurex_is_logged_in');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [currentSession, setCurrentSession] = useState<OperatorSession | null>(() => {
+    const saved = localStorage.getItem('futurex_current_session');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    const initialOp = DEFAULT_OPERATORS[0];
+    return {
+      sessionId: 'SES-001',
+      operatorId: initialOp.id,
+      operatorName: initialOp.name,
+      role: initialOp.role,
+      shift: initialOp.shift,
+      loginTime: new Date().toLocaleTimeString([], { hour12: false }),
+      loginDate: new Date().toLocaleDateString(),
+      isActive: true,
+    };
+  });
+
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const openLoginModal = useCallback(() => setIsLoginModalOpen(true), []);
+  const closeLoginModal = useCallback(() => setIsLoginModalOpen(false), []);
 
   // State
   const [feeders, setFeeders] = useState<FeederLine[]>(INITIAL_11KV_FEEDERS);
@@ -361,10 +447,25 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     dispatchNotifier.getStatus().permission
   );
+  const [smsRecipient, setSmsRecipient] = useState<string>(() => smsDispatcher.getRecipient());
+  const [isSmsModalOpen, setIsSmsModalOpen] = useState<boolean>(false);
+  const [isOperatorModalOpen, setIsOperatorModalOpen] = useState<boolean>(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
+
+  const openSmsModal = useCallback(() => setIsSmsModalOpen(true), []);
+  const closeSmsModal = useCallback(() => setIsSmsModalOpen(false), []);
+
+  const openOperatorModal = useCallback(() => setIsOperatorModalOpen(true), []);
+  const closeOperatorModal = useCallback(() => setIsOperatorModalOpen(false), []);
 
   const openStatusModal = useCallback(() => setIsStatusModalOpen(true), []);
   const closeStatusModal = useCallback(() => setIsStatusModalOpen(false), []);
+
+  const updateSmsRecipient = useCallback((phone: string) => {
+    const updated = smsDispatcher.setRecipient(phone);
+    setSmsRecipient(updated);
+    dispatchAudio.playAckChime();
+  }, []);
 
   const sendSMSAlert = useCallback(async (title: string, body: string) => {
     await smsDispatcher.sendSMS({
@@ -649,11 +750,222 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setOperators((prev) => [...prev, newOp]);
     setActiveOperator(newOp);
     dispatchAudio.playAckChime();
+    addLogEntry(
+      'COMMUNICATION',
+      'New Operator Enrolled',
+      'FutureX Console',
+      `Registered operator: ${newOp.name} (${newOp.role}, ${newOp.shift})`
+    );
+  }, [addLogEntry]);
+
+  // Update active operator's name and details
+  const updateActiveOperator = useCallback(
+    (updated: Partial<OperatorProfile>) => {
+      setActiveOperator((prev) => {
+        const next = { ...prev, ...updated };
+        setOperators((ops) => ops.map((op) => (op.id === prev.id ? next : op)));
+        addLogEntry(
+          'COMMUNICATION',
+          'Duty Operator Name / Profile Assigned',
+          'FutureX Console',
+          `Active operator name changed to: ${next.name} (${next.role}, ${next.shift})`
+        );
+        return next;
+      });
+      dispatchAudio.playAckChime();
+    },
+    [addLogEntry]
+  );
+
+  // Update any operator in the station directory
+  const updateOperator = useCallback(
+    (id: string, updated: Partial<OperatorProfile>) => {
+      setOperators((ops) =>
+        ops.map((op) => {
+          if (op.id === id) {
+            const next = { ...op, ...updated };
+            if (activeOperator.id === id) {
+              setActiveOperator(next);
+            }
+            return next;
+          }
+          return op;
+        })
+      );
+      dispatchAudio.playAckChime();
+    },
+    [activeOperator.id]
+  );
+
+  // Remove an operator
+  const deleteOperator = useCallback(
+    (id: string) => {
+      setOperators((ops) => {
+        if (ops.length <= 1) return ops;
+        const next = ops.filter((op) => op.id !== id);
+        if (activeOperator.id === id) {
+          setActiveOperator(next[0]);
+        }
+        return next;
+      });
+      dispatchAudio.playAckChime();
+    },
+    [activeOperator.id]
+  );
+
+  // Unique Operator Login, Logout, Lock, and PIN management
+  const loginOperator = useCallback(
+    (id: string, pin: string) => {
+      const op = operators.find((o) => o.id === id);
+      if (!op) {
+        return { success: false, error: 'Operator profile not found.' };
+      }
+      if (op.pin !== pin) {
+        dispatchAudio.playWarningChime();
+        return { success: false, error: 'Incorrect PIN. Authorization denied.' };
+      }
+
+      const now = new Date();
+      const newSession: OperatorSession = {
+        sessionId: `SES-${Date.now().toString().slice(-6)}`,
+        operatorId: op.id,
+        operatorName: op.name,
+        role: op.role,
+        shift: op.shift,
+        loginTime: now.toLocaleTimeString([], { hour12: false }),
+        loginDate: now.toLocaleDateString(),
+        isActive: true,
+      };
+
+      setActiveOperator(op);
+      setCurrentSession(newSession);
+      setIsLoggedIn(true);
+      setIsLoginModalOpen(false);
+
+      const loginTimestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      setOperators((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, lastLogin: loginTimestampStr } : o))
+      );
+
+      localStorage.setItem('futurex_is_logged_in', 'true');
+      localStorage.setItem('futurex_current_session', JSON.stringify(newSession));
+
+      dispatchAudio.playAckChime();
+      addLogEntry(
+        'COMMUNICATION',
+        'Operator Authenticated / Shift Login',
+        'SCADA Security Gateway',
+        `Operator ${op.name} (${op.id}) authenticated with PIN. Assumed active control of FutureX 132/33kV.`
+      );
+
+      return { success: true };
+    },
+    [operators, addLogEntry]
+  );
+
+  const logoutOperator = useCallback(() => {
+    if (currentSession) {
+      const endedSession = {
+        ...currentSession,
+        logoutTime: new Date().toLocaleTimeString([], { hour12: false }),
+        isActive: false,
+      };
+      setCurrentSession(endedSession);
+      localStorage.setItem('futurex_current_session', JSON.stringify(endedSession));
+    }
+    setIsLoggedIn(false);
+    localStorage.setItem('futurex_is_logged_in', 'false');
+    setIsLoginModalOpen(true);
+    dispatchAudio.playWarningChime();
+    addLogEntry(
+      'COMMUNICATION',
+      'Operator Logged Out / Console Secured',
+      'SCADA Security Gateway',
+      `Operator ${activeOperator.name} signed off duty. SCADA controls secured.`
+    );
+  }, [currentSession, activeOperator.name, addLogEntry]);
+
+  const lockConsole = useCallback(() => {
+    setIsLoggedIn(false);
+    localStorage.setItem('futurex_is_logged_in', 'false');
+    setIsLoginModalOpen(true);
+    dispatchAudio.playWarningChime();
+    addLogEntry(
+      'COMMUNICATION',
+      'Console Lock Screen Engaged',
+      'SCADA Security Gateway',
+      `Station console locked by Operator ${activeOperator.name}. PIN authorization required to operate breakers.`
+    );
+  }, [activeOperator.name, addLogEntry]);
+
+  const unlockConsole = useCallback(
+    (pin: string) => {
+      if (activeOperator.pin === pin) {
+        setIsLoggedIn(true);
+        localStorage.setItem('futurex_is_logged_in', 'true');
+        setIsLoginModalOpen(false);
+        dispatchAudio.playAckChime();
+        addLogEntry(
+          'COMMUNICATION',
+          'Console Unlocked',
+          'SCADA Security Gateway',
+          `Console unlocked by ${activeOperator.name} via security PIN.`
+        );
+        return { success: true };
+      } else {
+        dispatchAudio.playWarningChime();
+        return { success: false, error: 'Incorrect PIN. Console remains locked.' };
+      }
+    },
+    [activeOperator, addLogEntry]
+  );
+
+  const updateOperatorPin = useCallback(
+    (id: string, oldPin: string, newPin: string) => {
+      const op = operators.find((o) => o.id === id);
+      if (!op) return { success: false, error: 'Operator not found.' };
+      if (op.pin !== oldPin) {
+        return { success: false, error: 'Current PIN is incorrect.' };
+      }
+      if (!newPin || newPin.length < 4) {
+        return { success: false, error: 'New PIN must be at least 4 digits.' };
+      }
+
+      setOperators((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, pin: newPin } : o))
+      );
+      if (activeOperator.id === id) {
+        setActiveOperator((prev) => ({ ...prev, pin: newPin }));
+      }
+
+      dispatchAudio.playAckChime();
+      addLogEntry(
+        'COMMUNICATION',
+        'Operator PIN Changed',
+        'SCADA Security Gateway',
+        `Security PIN updated for Operator ${op.name} (${op.id}).`
+      );
+      return { success: true };
+    },
+    [operators, activeOperator.id, addLogEntry]
+  );
+
+  // Update Feeder name, town, or capacity
+  const updateFeeder = useCallback((id: string, updated: Partial<FeederLine>) => {
+    setFeeders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updated } : f))
+    );
+    dispatchAudio.playAckChime();
   }, []);
 
   // Feeder Breaker Toggle (Trip / Close)
   const toggleFeederBreaker = useCallback(
     (feederId: string) => {
+      if (!isLoggedIn) {
+        setIsLoginModalOpen(true);
+        dispatchAudio.playWarningChime();
+        return;
+      }
       setFeeders((prev) =>
         prev.map((f) => {
           if (f.id !== feederId) return f;
@@ -694,6 +1006,11 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Emergency load shed a specific feeder
   const emergencyShedFeeder = useCallback(
     (feederId: string, reason = 'Load Shedding Directive') => {
+      if (!isLoggedIn) {
+        setIsLoginModalOpen(true);
+        dispatchAudio.playWarningChime();
+        return;
+      }
       setFeeders((prev) =>
         prev.map((f) => {
           if (f.id !== feederId) return f;
@@ -717,11 +1034,16 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
       );
     },
-    [activeOperator.name, triggerAlert]
+    [isLoggedIn, activeOperator.name, triggerAlert]
   );
 
   // Restore all 8 feeders and turn alarm OFF
   const restoreAllFeeders = useCallback(() => {
+    if (!isLoggedIn) {
+      setIsLoginModalOpen(true);
+      dispatchAudio.playWarningChime();
+      return;
+    }
     // 1. Immediately turn off the alarm siren and play restoration chime
     dispatchAudio.stopContinuousSiren();
     dispatchAudio.playRestorationChime();
@@ -763,11 +1085,16 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       'FutureX 11kV Switchboard',
       `Full re-energization executed by Operator ${activeOperator.name}. Alarm siren deactivated, SMS sent to +2348067254663.`
     );
-  }, [activeOperator.name, addLogEntry]);
+  }, [isLoggedIn, activeOperator.name, addLogEntry]);
 
   // Transformer Tap Adjustment
   const adjustTransformerTap = useCallback(
     (txId: string, delta: number) => {
+      if (!isLoggedIn) {
+        setIsLoginModalOpen(true);
+        dispatchAudio.playWarningChime();
+        return;
+      }
       setTransformers((prev) =>
         prev.map((t) => {
           if (t.id !== txId) return t;
@@ -788,7 +1115,7 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
       );
     },
-    [activeOperator.name, addLogEntry]
+    [isLoggedIn, activeOperator.name, addLogEntry]
   );
 
   // Toggle cooling fans
@@ -1027,12 +1354,35 @@ export const DispatchProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         activeScenario,
         soundMuted,
         notificationPermission,
+        smsRecipient,
+        updateSmsRecipient,
+        isSmsModalOpen,
+        openSmsModal,
+        closeSmsModal,
+        isOperatorModalOpen,
+        openOperatorModal,
+        closeOperatorModal,
         isStatusModalOpen,
         openStatusModal,
         closeStatusModal,
         sendSMSAlert,
+        // Operator Auth & Unique Login
+        isLoggedIn,
+        currentSession,
+        isLoginModalOpen,
+        openLoginModal,
+        closeLoginModal,
+        loginOperator,
+        logoutOperator,
+        lockConsole,
+        unlockConsole,
+        updateOperatorPin,
         setActiveOperatorById,
+        updateActiveOperator,
+        updateOperator,
+        deleteOperator,
         addOperator,
+        updateFeeder,
         toggleFeederBreaker,
         adjustTransformerTap,
         toggleCoolingFans,
